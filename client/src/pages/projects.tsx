@@ -66,7 +66,7 @@ export default function Projects() {
     }
   };
 
-  const calculateProgress = (team: Team) => {
+  const calculateProgress = (team: Team): number => {
     if (!team.deadline) return 25; // Default progress for ongoing projects
     const start = new Date(team.createdAt || Date.now());
     const end = new Date(team.deadline);
@@ -215,7 +215,7 @@ export default function Projects() {
               <div className="space-y-4">
                 {myTeams.map((team) => {
                   const status = getProjectStatus(team);
-                  const progress = calculateProgress(team);
+                  const progress: number = calculateProgress(team);
                   const isLeader = team.leaderId === user.id;
                   const daysLeft = team.deadline ? getDaysLeft(team.deadline) : null;
 
