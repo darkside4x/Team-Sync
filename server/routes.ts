@@ -19,42 +19,46 @@ const sessionConfig = {
   }
 };
 
-// Configure Google OAuth
-passport.use(new GoogleStrategy({
-  clientID: process.env.GOOGLE_CLIENT_ID || "",
-  clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
-  callbackURL: "/api/auth/google/callback"
-}, async (accessToken, refreshToken, profile, done) => {
-  try {
-    const email = profile.emails?.[0]?.value;
-    if (!email) return done(new Error("No email found"), undefined);
+// Configure Google OAuth (only if credentials are provided)
+const hasOAuthCredentials = process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET;
 
-    // Check if domain is allowed (not gmail.com)
-    const domain = email.split('@')[1];
-    if (domain === 'gmail.com') {
-      return done(new Error("Gmail accounts are not allowed. Please use your institutional email."), undefined);
+if (hasOAuthCredentials) {
+  passport.use(new GoogleStrategy({
+    clientID: process.env.GOOGLE_CLIENT_ID!,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    callbackURL: "/api/auth/google/callback"
+  }, async (accessToken, refreshToken, profile, done) => {
+    try {
+      const email = profile.emails?.[0]?.value;
+      if (!email) return done(new Error("No email found"), undefined);
+
+      // Check if domain is allowed (not gmail.com)
+      const domain = email.split('@')[1];
+      if (domain === 'gmail.com') {
+        return done(new Error("Gmail accounts are not allowed. Please use your institutional email."), undefined);
+      }
+
+      // Check if user exists
+      let user = await storage.getUserByGoogleId(profile.id);
+      
+      if (!user) {
+        // Create new user
+        user = await storage.createUser({
+          googleId: profile.id,
+          email: email,
+          name: profile.displayName || "",
+          avatar: profile.photos?.[0]?.value,
+          university: domain.includes('vit') ? 'VIT University' : domain.split('.')[0].toUpperCase(),
+          isProfileComplete: false
+        });
+      }
+
+      return done(null, user);
+    } catch (error) {
+      return done(error, undefined);
     }
-
-    // Check if user exists
-    let user = await storage.getUserByGoogleId(profile.id);
-    
-    if (!user) {
-      // Create new user
-      user = await storage.createUser({
-        googleId: profile.id,
-        email: email,
-        name: profile.displayName || "",
-        avatar: profile.photos?.[0]?.value,
-        university: domain.includes('vit') ? 'VIT University' : domain.split('.')[0].toUpperCase(),
-        isProfileComplete: false
-      });
-    }
-
-    return done(null, user);
-  } catch (error) {
-    return done(error, undefined);
-  }
-}));
+  }));
+}
 
 passport.serializeUser((user: any, done) => {
   done(null, user.id);
@@ -74,22 +78,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(passport.initialize());
   app.use(passport.session());
 
-  // Auth routes
-  app.get("/api/auth/google", passport.authenticate("google", {
-    scope: ["profile", "email"]
-  }));
+  // Auth routes (only if OAuth is configured)
+  if (hasOAuthCredentials) {
+    app.get("/api/auth/google", passport.authenticate("google", {
+      scope: ["profile", "email"]
+    }));
 
-  app.get("/api/auth/google/callback", 
-    passport.authenticate("google", { failureRedirect: "/?error=auth_failed" }),
-    (req, res) => {
-      const user = req.user as any;
-      if (!user.isProfileComplete) {
-        res.redirect("/profile");
-      } else {
-        res.redirect("/dashboard");
+    app.get("/api/auth/google/callback", 
+      passport.authenticate("google", { failureRedirect: "/?error=auth_failed" }),
+      (req, res) => {
+        const user = req.user as any;
+        if (!user.isProfileComplete) {
+          res.redirect("/profile");
+        } else {
+          res.redirect("/dashboard");
+        }
       }
-    }
-  );
+    );
+  }
 
   app.post("/api/auth/logout", (req, res) => {
     req.logout(() => {
