@@ -23,18 +23,18 @@ export function TeamCard({ team, onJoin, showJoinButton = true }: TeamCardProps)
   };
 
   return (
-    <Card className="hover:border-primary/30 transition-all duration-200 hover:shadow-md">
+    <Card className="professional-card hover-lift hover:border-primary/30">
       <CardHeader>
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2">
-              <h3 className="font-semibold text-foreground text-lg">{team.name}</h3>
-              <Badge variant="secondary" className="bg-accent text-accent-foreground">
+              <h3 className="font-semibold text-foreground text-lg line-clamp-1">{team.name}</h3>
+              <Badge className="status-badge status-active">
                 {Math.floor(Math.random() * 20 + 80)}% Match
               </Badge>
             </div>
-            <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{team.description}</p>
-            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground mb-4 line-clamp-2 leading-relaxed">{team.description}</p>
+            <div className="flex items-center gap-4 text-sm text-muted-foreground">
               <span className="flex items-center gap-1">
                 <Users className="h-3 w-3" />
                 {memberCount}/{team.maxMembers} Members
@@ -53,9 +53,9 @@ export function TeamCard({ team, onJoin, showJoinButton = true }: TeamCardProps)
               )}
             </div>
           </div>
-          <div className="flex -space-x-2">
+          <div className="flex -space-x-2 ml-4">
             {team.members?.slice(0, 3).map((member, index) => (
-              <Avatar key={index} className="h-8 w-8 border-2 border-card">
+              <Avatar key={index} className="h-10 w-10 border-2 border-card shadow-sm">
                 <AvatarImage src={member.avatar} />
                 <AvatarFallback className="text-xs">
                   {member.name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
@@ -65,22 +65,22 @@ export function TeamCard({ team, onJoin, showJoinButton = true }: TeamCardProps)
           </div>
         </div>
       </CardHeader>
-      <CardContent className="pt-0">
-        <div className="flex flex-wrap gap-2 mb-4">
+      <CardContent className="pt-0 space-y-4">
+        <div className="flex flex-wrap gap-2">
           {requiredSkills.slice(0, 4).map((skill: string, index: number) => (
-            <Badge key={index} variant="outline" className="text-xs">
+            <span key={index} className="skill-tag">
               {skill}
-            </Badge>
+            </span>
           ))}
           {requiredSkills.length > 4 && (
-            <Badge variant="outline" className="text-xs">
+            <span className="skill-tag">
               +{requiredSkills.length - 4} more
-            </Badge>
+            </span>
           )}
         </div>
         {showJoinButton && (
           <Button 
-            className="w-full" 
+            className="w-full professional-button rounded-lg" 
             onClick={handleJoin}
             data-testid={`button-join-${team.id}`}
           >

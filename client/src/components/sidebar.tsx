@@ -30,19 +30,19 @@ export function Sidebar() {
   if (!user) return null;
 
   return (
-    <aside className="bg-card border-r border-border w-64 flex-shrink-0 sidebar-transition">
-      <div className="p-6">
-        <div className="flex items-center space-x-3 mb-8">
-          <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-            <Users className="text-primary-foreground text-lg" />
+    <aside className="bg-card/95 backdrop-blur-xl border-r border-border/50 w-72 flex-shrink-0 sidebar-transition shadow-sm">
+      <div className="p-8">
+        <div className="flex items-center space-x-4 mb-10">
+          <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center border border-primary/20">
+            <Users className="text-primary text-xl" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-foreground">TeamSync Edu</h1>
-            <p className="text-sm text-muted-foreground">{user.university}</p>
+            <h1 className="text-xl font-bold text-foreground brand-title">TeamSync</h1>
+            <p className="text-sm text-muted-foreground font-medium">{user.university}</p>
           </div>
         </div>
 
-        <nav className="space-y-2">
+        <nav className="space-y-3">
           {navigation.map((item) => {
             const isActive = location === item.href;
             const Icon = item.icon;
@@ -52,12 +52,14 @@ export function Sidebar() {
                 <Button
                   variant={isActive ? "default" : "ghost"}
                   className={cn(
-                    "w-full justify-start",
-                    isActive && "bg-primary text-primary-foreground"
+                    "w-full justify-start h-12 rounded-xl font-medium transition-all duration-200",
+                    isActive 
+                      ? "bg-primary text-primary-foreground shadow-sm" 
+                      : "hover:bg-muted/50 text-muted-foreground hover:text-foreground"
                   )}
                   data-testid={`nav-${item.name.toLowerCase().replace(' ', '-')}`}
                 >
-                  <Icon className="mr-2 h-4 w-4" />
+                  <Icon className="mr-3 h-5 w-5" />
                   {item.name}
                 </Button>
               </Link>
@@ -65,19 +67,19 @@ export function Sidebar() {
           })}
         </nav>
 
-        <div className="mt-8 pt-6 border-t border-border">
-          <div className="flex items-center space-x-3">
-            <Avatar className="h-10 w-10">
+        <div className="mt-10 pt-8 border-t border-border/50">
+          <div className="flex items-center space-x-4">
+            <Avatar className="h-12 w-12 border-2 border-border">
               <AvatarImage src={user.avatar || ""} alt={user.name} />
               <AvatarFallback>
                 {user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-foreground truncate">{user.name}</p>
-              <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+              <p className="text-sm font-semibold text-foreground truncate">{user.name}</p>
+              <p className="text-sm text-muted-foreground truncate">{user.email}</p>
             </div>
-            <Button variant="ghost" size="sm">
+            <Button variant="ghost" size="sm" className="rounded-lg hover:bg-muted/50">
               <Settings className="h-4 w-4" />
             </Button>
           </div>

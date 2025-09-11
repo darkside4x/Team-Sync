@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Users, Trophy, Zap, Shield, Star, Github, Linkedin } from "lucide-react";
+import { Users, Trophy, Zap, Shield, Star, Github, Linkedin, ArrowRight, CheckCircle, Sparkles } from "lucide-react";
 import { GOOGLE_AUTH_URL } from "@/lib/auth";
 import { useAuth } from "@/hooks/use-auth";
 import { Link } from "wouter";
@@ -35,51 +35,55 @@ export default function Landing() {
   }
 
   return (
-    <div className="min-h-screen subtle-animated-bg">
+    <div className="min-h-screen subtle-animated-bg overflow-hidden">
       {/* Hero Section */}
-      <section className="relative overflow-hidden">
+      <section className="relative overflow-hidden section-padding">
         <div className="absolute inset-0 bg-grid-pattern opacity-5" />
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-16">
+        <div className="relative max-w-7xl mx-auto container-padding">
           <div className="text-center">
             <div className="flex justify-center mb-8">
-              <Badge variant="secondary" className="px-4 py-2 text-sm">
-                Built for Digital Dawn Hackathon 🏆 Code2Create ASM VIT Vellore
+              <Badge variant="secondary" className="px-6 py-3 text-sm font-medium rounded-full border border-primary/20 bg-primary/5 text-primary">
+                <Sparkles className="w-4 h-4 mr-2" />
+                Built for Digital Dawn Hackathon • Code2Create ASM VIT Vellore
               </Badge>
             </div>
             
             <h1 
-              className={`brand-title text-4xl md:text-6xl font-bold text-foreground mb-6 transition-all duration-1000 ${
+              className={`brand-title text-5xl md:text-7xl font-bold text-foreground mb-8 transition-all duration-1000 ${
                 isAnimating ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'
               }`}
             >
-              Find Your Perfect
-              <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                {" "}Team Mate
+              Find Your Perfect{" "}
+              <span className="bg-gradient-to-r from-primary via-primary to-accent bg-clip-text text-transparent">
+                Team Mate
               </span>
             </h1>
             
             <p 
-              className={`text-xl text-muted-foreground mb-8 max-w-3xl mx-auto transition-all duration-1000 delay-200 ${
+              className={`text-xl md:text-2xl text-muted-foreground mb-12 max-w-4xl mx-auto leading-relaxed transition-all duration-1000 delay-200 ${
                 isAnimating ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'
               }`}
             >
-              TimeSync is a specialized team formation platform designed to revolutionize 
+              TeamSync is a specialized team formation platform designed to revolutionize 
               how students at Indian technical universities collaborate for hackathons, competitions, and academic projects.
             </p>
             
             <div 
-              className={`flex flex-col sm:flex-row gap-4 justify-center items-center transition-all duration-1000 delay-400 ${
+              className={`flex flex-col sm:flex-row gap-6 justify-center items-center transition-all duration-1000 delay-400 ${
                 isAnimating ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'
               }`}
             >
-              <Button size="lg" asChild className="bg-primary hover:bg-primary/90 text-lg px-8 py-6">
+              <Button size="lg" asChild className="professional-button text-lg px-10 py-4 rounded-xl shadow-lg hover:shadow-xl group">
                 <a href={GOOGLE_AUTH_URL} data-testid="button-get-started">
-                  <Users className="mr-2 h-5 w-5" />
+                  <Users className="mr-3 h-5 w-5" />
                   Get Started with Google
+                  <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
                 </a>
               </Button>
-              <p className="text-sm text-muted-foreground">
-                🎓 Only for University Students (no gmail.com accounts)
+              <div className="flex items-center text-sm text-muted-foreground bg-muted/50 px-4 py-2 rounded-full">
+                <CheckCircle className="w-4 h-4 mr-2 text-accent" />
+                Only for University Students (no gmail.com accounts)
+              </div>
               </p>
             </div>
           </div>
@@ -98,7 +102,7 @@ export default function Landing() {
           </div>
 
           {/* Floating Team Cards Animation */}
-          <div className="mt-16 relative">
+          <div className="mt-20 relative">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
               {[
                 { 
@@ -122,23 +126,23 @@ export default function Landing() {
               ].map((team, index) => (
                 <Card 
                   key={team.name}
-                  className={`hover:shadow-lg transition-all duration-500 delay-${600 + index * 200} ${
+                  className={`professional-card hover-lift delay-${600 + index * 200} ${
                     isAnimating ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'
                   }`}
                 >
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg">{team.name}</CardTitle>
-                      <Badge className="bg-accent text-accent-foreground">{team.match} Match</Badge>
+                      <CardTitle className="text-lg font-semibold">{team.name}</CardTitle>
+                      <Badge className="status-badge status-active">{team.match} Match</Badge>
                     </div>
-                    <CardDescription className="text-sm">{team.event}</CardDescription>
+                    <CardDescription className="text-sm text-muted-foreground">{team.event}</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="flex flex-wrap gap-1">
                       {team.skills.map((skill) => (
-                        <Badge key={skill} variant="outline" className="text-xs">
+                        <span key={skill} className="skill-tag">
                           {skill}
-                        </Badge>
+                        </span>
                       ))}
                     </div>
                   </CardContent>
@@ -150,18 +154,18 @@ export default function Landing() {
       </section>
 
       {/* Features Section */}
-      <section className="py-20 bg-card/50 backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold text-foreground mb-4">
+      <section className="section-padding bg-card/30 backdrop-blur-sm border-y border-border/50">
+        <div className="max-w-7xl mx-auto container-padding">
+          <div className="text-center mb-20">
+            <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-6">
               Why Choose TeamSync?
             </h2>
-            <p className="text-xl text-muted-foreground">
+            <p className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto">
               Built specifically for Indian technical universities with institutional security
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
             {[
               {
                 icon: Shield,
@@ -196,15 +200,15 @@ export default function Landing() {
             ].map((feature, index) => {
               const Icon = feature.icon;
               return (
-                <Card key={feature.title} className="text-center hover:shadow-md transition-shadow">
-                  <CardHeader>
-                    <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mx-auto mb-4">
-                      <Icon className="h-6 w-6 text-primary" />
+                <Card key={feature.title} className="professional-card text-center hover-lift group">
+                  <CardHeader className="pb-4">
+                    <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:bg-primary/20 transition-colors">
+                      <Icon className="h-8 w-8 text-primary" />
                     </div>
-                    <CardTitle className="text-xl">{feature.title}</CardTitle>
+                    <CardTitle className="text-xl font-semibold mb-3">{feature.title}</CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <CardDescription className="text-base">
+                  <CardContent className="pt-0">
+                    <CardDescription className="text-base leading-relaxed">
                       {feature.description}
                     </CardDescription>
                   </CardContent>
@@ -216,34 +220,35 @@ export default function Landing() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20">
-        <div className="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-bold text-foreground mb-4">
+      <section className="section-padding">
+        <div className="max-w-4xl mx-auto text-center container-padding">
+          <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-6">
             Ready to Find Your Dream Team?
           </h2>
-          <p className="text-xl text-muted-foreground mb-8">
+          <p className="text-xl md:text-2xl text-muted-foreground mb-12 leading-relaxed">
             Join thousands of students from VIT, NIT, and other premier institutions
           </p>
-          <Button size="lg" asChild className="bg-primary hover:bg-primary/90 text-lg px-8 py-6">
+          <Button size="lg" asChild className="professional-button text-lg px-12 py-5 rounded-xl shadow-lg hover:shadow-xl group">
             <a href={GOOGLE_AUTH_URL} data-testid="button-join-now">
               Join TeamSync Now
+              <ArrowRight className="ml-3 h-5 w-5 group-hover:translate-x-1 transition-transform" />
             </a>
           </Button>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="bg-card border-t border-border py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <footer className="bg-card/50 backdrop-blur-sm border-t border-border py-16">
+        <div className="max-w-7xl mx-auto container-padding">
           <div className="text-center">
             <div className="flex items-center justify-center space-x-2 mb-4">
-              <img src={TeamSyncLogo} alt="TimeSync Logo" className="w-8 h-8 object-contain" />
-              <h3 className="brand-title text-lg font-bold text-foreground">TimeSync</h3>
+              <img src={TeamSyncLogo} alt="TeamSync Logo" className="w-10 h-10 object-contain" />
+              <h3 className="brand-title text-xl font-bold text-foreground">TeamSync</h3>
             </div>
-            <p className="text-muted-foreground mb-6">
+            <p className="text-muted-foreground mb-8 text-lg">
               Made with ❤️ by <strong>Team N00B</strong> for Digital Dawn Hackathon
             </p>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-muted-foreground">
               Code2Create ASM VIT Vellore Chapter • Empowering Student Collaboration
             </p>
           </div>
@@ -286,26 +291,26 @@ function InstitutionLoginForm() {
   };
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <form onSubmit={onSubmit} className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div>
-          <Label htmlFor="inst-email">Email</Label>
-          <Input id="inst-email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="admin@vit.ac.in" />
+          <Label htmlFor="inst-email" className="text-sm font-medium text-foreground">Email</Label>
+          <Input id="inst-email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="admin@vit.ac.in" className="professional-input mt-2" />
         </div>
         <div>
-          <Label htmlFor="inst-password">Password</Label>
-          <Input id="inst-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••" />
+          <Label htmlFor="inst-password" className="text-sm font-medium text-foreground">Password</Label>
+          <Input id="inst-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••" className="professional-input mt-2" />
         </div>
         <div>
-          <Label htmlFor="inst-domain">Domain</Label>
-          <Input id="inst-domain" value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="vitstudent.ac.in" />
+          <Label htmlFor="inst-domain" className="text-sm font-medium text-foreground">Domain</Label>
+          <Input id="inst-domain" value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="vitstudent.ac.in" className="professional-input mt-2" />
         </div>
       </div>
-      <div className="flex items-center gap-3">
-        <Button type="submit" disabled={loading} data-testid="button-institution-login">
+      <div className="flex items-center gap-4">
+        <Button type="submit" disabled={loading} data-testid="button-institution-login" className="professional-button">
           {loading ? "Logging in..." : "Institution Login"}
         </Button>
-        {message && <span className="text-sm text-muted-foreground">{message}</span>}
+        {message && <span className="text-sm text-muted-foreground bg-muted/50 px-3 py-1 rounded-full">{message}</span>}
       </div>
     </form>
   );
