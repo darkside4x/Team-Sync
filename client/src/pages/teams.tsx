@@ -13,6 +13,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { Search, Filter, Users, Plus } from "lucide-react";
 import type { Team } from "@shared/schema";
 import { Link } from "wouter";
+import { CreateTeamModal } from "@/components/create-team-modal";
 
 const CATEGORIES = [
   { value: "all", label: "All Categories" },
@@ -31,7 +32,7 @@ export default function Teams() {
   const [selectedCategory, setSelectedCategory] = useState("all");
 
   const { data: teams = [], isLoading } = useQuery<Team[]>({
-    queryKey: ["/api/teams", selectedCategory === "all" ? undefined : selectedCategory],
+    queryKey: ["/api/teams", selectedCategory === "all" ? "?all=true" : `?category=${selectedCategory}`],
     enabled: isAuthenticated
   });
 
@@ -46,9 +47,12 @@ export default function Teams() {
       queryClient.invalidateQueries({ queryKey: ["/api/teams"] });
     },
     onError: (error) => {
+      const msg = error.message.includes("409")
+        ? "You can only send one request per team."
+        : error.message;
       toast({
-        title: "Error",
-        description: error.message,
+        title: "Request not sent",
+        description: msg,
         variant: "destructive"
       });
     }
@@ -86,10 +90,12 @@ export default function Teams() {
               <h2 className="text-2xl font-bold text-foreground">Find Teams</h2>
               <p className="text-muted-foreground">Discover teams that match your skills and interests</p>
             </div>
-            <Button className="bg-primary text-primary-foreground" data-testid="button-create-team">
-              <Plus className="mr-2 h-4 w-4" />
-              Create Team
-            </Button>
+            <CreateTeamModal>
+              <Button className="bg-primary text-primary-foreground" data-testid="button-create-team">
+                <Plus className="mr-2 h-4 w-4" />
+                Create Team
+              </Button>
+            </CreateTeamModal>
           </div>
         </header>
 
@@ -199,10 +205,12 @@ export default function Teams() {
                         Clear Filters
                       </Button>
                     )}
-                    <Button data-testid="button-create-first-team">
-                      <Plus className="mr-2 h-4 w-4" />
-                      Create Team
-                    </Button>
+                    <CreateTeamModal>
+                      <Button data-testid="button-create-first-team">
+                        <Plus className="mr-2 h-4 w-4" />
+                        Create Team
+                      </Button>
+                    </CreateTeamModal>
                   </div>
                 </CardContent>
               </Card>

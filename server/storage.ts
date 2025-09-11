@@ -16,11 +16,13 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, user: Partial<InsertUser>): Promise<User>;
   getAllUsers(): Promise<User[]>;
+  getUsersByEmailDomain(domain: string): Promise<User[]>;
   
   // Team methods
   getTeam(id: string): Promise<Team | undefined>;
   getTeamsByUser(userId: string): Promise<Team[]>;
   getTeamsByCategory(category: string): Promise<Team[]>;
+  getAllActiveTeams(): Promise<Team[]>;
   getRecommendedTeams(userId: string): Promise<Team[]>;
   createTeam(team: InsertTeam): Promise<Team>;
   updateTeam(id: string, team: Partial<InsertTeam>): Promise<Team>;
@@ -35,6 +37,9 @@ export interface IStorage {
   // Team request methods
   getTeamRequests(teamId: string): Promise<TeamRequest[]>;
   getTeamRequestsByUser(userId: string): Promise<TeamRequest[]>;
+  getTeamRequestsByTeamAndUser(teamId: string, userId: string): Promise<TeamRequest[]>;
+  deleteTeamRequestsExceptLatest(teamId: string, userId: string): Promise<number>;
+  deleteAllTeamRequests(teamId: string): Promise<number>;
   createTeamRequest(request: InsertTeamRequest): Promise<TeamRequest>;
   updateTeamRequest(id: string, status: string): Promise<TeamRequest>;
   
@@ -87,6 +92,11 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(users);
   }
 
+  async getUsersByEmailDomain(domain: string): Promise<User[]> {
+    // Match emails ending with @domain
+    return await db.select().from(users).where(ilike(users.email, `%@${domain}`));
+  }
+
   // Team methods
   async getTeam(id: string): Promise<Team | undefined> {
     const [team] = await db.select().from(teams).where(eq(teams.id, id));
@@ -115,6 +125,10 @@ export class DatabaseStorage implements IStorage {
 
   async getTeamsByCategory(category: string): Promise<Team[]> {
     return await db.select().from(teams).where(and(eq(teams.category, category), eq(teams.isActive, true)));
+  }
+
+  async getAllActiveTeams(): Promise<Team[]> {
+    return await db.select().from(teams).where(eq(teams.isActive, true));
   }
 
   async getRecommendedTeams(userId: string): Promise<Team[]> {
@@ -189,6 +203,33 @@ export class DatabaseStorage implements IStorage {
 
   async getTeamRequestsByUser(userId: string): Promise<TeamRequest[]> {
     return await db.select().from(teamRequests).where(eq(teamRequests.userId, userId));
+  }
+
+  async getTeamRequestsByTeamAndUser(teamId: string, userId: string): Promise<TeamRequest[]> {
+    return await db.select().from(teamRequests)
+      .where(and(eq(teamRequests.teamId, teamId), eq(teamRequests.userId, userId)))
+      .orderBy(desc(teamRequests.createdAt));
+  }
+
+  async deleteTeamRequestsExceptLatest(teamId: string, userId: string): Promise<number> {
+    const requests = await this.getTeamRequestsByTeamAndUser(teamId, userId);
+    if (requests.length <= 1) return 0;
+    const latestId = requests[0].id;
+    const result = await db.delete(teamRequests)
+      .where(and(
+        eq(teamRequests.teamId, teamId),
+        eq(teamRequests.userId, userId),
+        not(eq(teamRequests.id, latestId))
+      ));
+    // drizzle delete returns { rowCount? }, but we don't depend on it strictly
+    // Return approximate count of deleted items
+    return Math.max(0, requests.length - 1);
+  }
+
+  async deleteAllTeamRequests(teamId: string): Promise<number> {
+    const existing = await this.getTeamRequests(teamId);
+    await db.delete(teamRequests).where(eq(teamRequests.teamId, teamId));
+    return existing.length;
   }
 
   async createTeamRequest(request: InsertTeamRequest): Promise<TeamRequest> {

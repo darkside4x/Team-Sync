@@ -11,7 +11,11 @@ import Dashboard from "@/pages/dashboard";
 import Profile from "@/pages/profile";
 import Teams from "@/pages/teams";
 import Chat from "@/pages/chat";
+import Projects from "@/pages/projects";
+import Events from "@/pages/events";
+import PublicProfile from "@/pages/public-profile.tsx";
 import NotFound from "@/pages/not-found";
+import InstitutionDashboard from "@/pages/institution-dashboard";
 
 function Router() {
   return (
@@ -20,6 +24,10 @@ function Router() {
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/profile" component={Profile} />
       <Route path="/teams" component={Teams} />
+      <Route path="/projects" component={Projects} />
+      <Route path="/events" component={Events} />
+      <Route path="/institution" component={InstitutionDashboard} />
+      <Route path="/users/:handle" component={PublicProfile} />
       <Route path="/chat" component={Chat} />
       {/* Fallback to 404 */}
       <Route component={NotFound} />

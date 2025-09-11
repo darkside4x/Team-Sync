@@ -5,7 +5,7 @@ import session from "express-session";
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { storage } from "./storage";
-import { insertUserSchema, insertTeamSchema, insertTeamRequestSchema, insertMessageSchema } from "@shared/schema";
+import { insertUserSchema, insertTeamSchema, insertTeamRequestSchema, insertMessageSchema, insertEventSchema } from "@shared/schema";
 import { z } from "zod";
 
 // Configure session
@@ -105,6 +105,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Institution auth (simple session-based)
+  app.post("/api/auth/institution/login", (req, res) => {
+    const { email, password, domain } = req.body || {};
+    if (
+      email === "admin@vit.ac.in" &&
+      password === "vit" &&
+      domain === "vitstudent.ac.in"
+    ) {
+      // Store minimal institution session separate from passport user session
+      (req.session as any).institution = {
+        email,
+        domain,
+        role: "institution"
+      };
+      return res.json({ success: true });
+    }
+    return res.status(401).json({ error: "Invalid credentials" });
+  });
+
+  app.post("/api/auth/institution/logout", (req, res) => {
+    if ((req.session as any).institution) {
+      delete (req.session as any).institution;
+    }
+    res.json({ success: true });
+  });
+
+  app.get("/api/auth/institution/me", (req, res) => {
+    const inst = (req.session as any).institution;
+    if (inst) {
+      return res.json(inst);
+    }
+    return res.status(401).json({ error: "Not authenticated" });
+  });
+
   // User routes
   app.post("/api/users/profile", async (req, res) => {
     if (!req.user) return res.status(401).json({ error: "Not authenticated" });
@@ -141,6 +175,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/users/:id", async (req, res) => {
+    if (!req.user) return res.status(401).json({ error: "Not authenticated" });
+    try {
+      const user = await storage.getUser(req.params.id);
+      if (!user) return res.status(404).json({ error: "User not found" });
+      res.json({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        avatar: user.avatar,
+        university: user.university,
+        department: user.department,
+        skills: user.skills,
+        bio: user.bio,
+        socialLinks: user.socialLinks,
+        achievements: user.achievements,
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch user" });
+    }
+  });
+
   app.get("/api/users/username/:username", async (req, res) => {
     try {
       const user = await storage.getUserByUsername(req.params.username);
@@ -150,15 +206,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Public: get user profile by username (no auth required)
+  app.get("/api/public/users/:username", async (req, res) => {
+    try {
+      const username = req.params.username?.replace(/^@/, "");
+      if (!username) return res.status(400).json({ error: "Username required" });
+      const user = await storage.getUserByUsername(username);
+      if (!user) return res.status(404).json({ error: "User not found" });
+      res.json({
+        id: user.id,
+        username: user.username,
+        name: user.name,
+        avatar: user.avatar,
+        university: user.university,
+        department: user.department,
+        bio: user.bio,
+        skills: user.skills,
+        achievements: user.achievements,
+        socialLinks: user.socialLinks,
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch user" });
+    }
+  });
+
   // Team routes
   app.get("/api/teams", async (req, res) => {
     if (!req.user) return res.status(401).json({ error: "Not authenticated" });
     
     try {
-      const { category } = req.query;
+      const { category, all } = req.query as { category?: string; all?: string };
       let teams;
-      
-      if (category && typeof category === 'string') {
+      if (all === 'true') {
+        teams = await storage.getAllActiveTeams();
+      } else if (category && typeof category === 'string') {
         teams = await storage.getTeamsByCategory(category);
       } else {
         teams = await storage.getRecommendedTeams((req.user as any).id);
@@ -185,9 +266,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!req.user) return res.status(401).json({ error: "Not authenticated" });
     
     try {
+      const raw = req.body || {};
       const teamData = insertTeamSchema.parse({
-        ...req.body,
-        leaderId: (req.user as any).id
+        ...raw,
+        leaderId: (req.user as any).id,
+        // Coerce types from JSON
+        maxMembers: typeof raw.maxMembers === 'string' ? parseInt(raw.maxMembers, 10) : raw.maxMembers,
+        deadline: raw.deadline ? new Date(raw.deadline) : undefined,
+        requiredSkills: Array.isArray(raw.requiredSkills) ? raw.requiredSkills : undefined,
       });
       const team = await storage.createTeam(teamData);
       res.json(team);
@@ -215,9 +301,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!req.user) return res.status(401).json({ error: "Not authenticated" });
     
     try {
+      // Prevent duplicates and members re-requesting
+      const teamId = req.params.id;
+      const userId = (req.user as any).id;
+      const existingMembers = await storage.getTeamMembers(teamId);
+      const isAlreadyMember = existingMembers.some(m => m.userId === userId && m.status === "approved");
+      if (isAlreadyMember) {
+        return res.status(409).json({ error: "Already a team member" });
+      }
+      const existingRequests = await storage.getTeamRequestsByTeamAndUser(teamId, userId);
+      if (existingRequests.length > 0) {
+        // Keep the latest pending, remove duplicates for cleanliness
+        await storage.deleteTeamRequestsExceptLatest(teamId, userId);
+        const latest = existingRequests[0];
+        if (latest.status === "pending") {
+          return res.status(409).json({ error: "You have already requested to join this team." });
+        }
+        if (latest.status === "approved") {
+          return res.status(409).json({ error: "Already a team member." });
+        }
+        if (latest.status === "rejected") {
+          return res.status(409).json({ error: "Your previous request was rejected." });
+        }
+      }
+
       const requestData = insertTeamRequestSchema.parse({
-        teamId: req.params.id,
-        userId: (req.user as any).id,
+        teamId,
+        userId,
         message: req.body.message
       });
       const request = await storage.createTeamRequest(requestData);
@@ -237,10 +347,93 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Not authorized" });
       }
       
-      const requests = await storage.getTeamRequests(req.params.id);
-      res.json(requests);
+      // Cleanup duplicates before returning
+      const allForTeam = await storage.getTeamRequests(req.params.id);
+      const byUser = new Map<string, any[]>();
+      for (const r of allForTeam) {
+        const arr = byUser.get(r.userId) || [];
+        arr.push(r);
+        byUser.set(r.userId, arr);
+      }
+      for (const [userId, list] of byUser) {
+        list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        if (list.length > 1) {
+          await storage.deleteTeamRequestsExceptLatest(req.params.id, userId);
+        }
+      }
+      let requests = await storage.getTeamRequests(req.params.id);
+      // Only return pending requests for visibility in Manage tab
+      requests = requests.filter(r => r.status === "pending");
+      // Attach basic user info for display
+      const requestsWithUsers = await Promise.all(requests.map(async (r) => {
+        try {
+          const u = await storage.getUser(r.userId);
+          return { ...r, user: u ? { id: u.id, name: u.name, avatar: u.avatar, email: u.email } : undefined };
+        } catch {
+          return r as any;
+        }
+      }));
+      res.json(requestsWithUsers);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch requests" });
+    }
+  });
+
+  // Clear all requests for a specific team (leader only)
+  app.delete("/api/teams/:id/requests", async (req, res) => {
+    if (!req.user) return res.status(401).json({ error: "Not authenticated" });
+    try {
+      const team = await storage.getTeam(req.params.id);
+      if (!team) return res.status(404).json({ error: "Team not found" });
+      if (team.leaderId !== (req.user as any).id) {
+        return res.status(403).json({ error: "Not authorized" });
+      }
+      const cleared = await storage.deleteAllTeamRequests(team.id);
+      res.json({ success: true, cleared });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to clear requests" });
+    }
+  });
+
+  // Clear all requests for teams led by the current user
+  app.delete("/api/teams/my/requests", async (req, res) => {
+    if (!req.user) return res.status(401).json({ error: "Not authenticated" });
+    try {
+      const myTeams = await storage.getTeamsByUser((req.user as any).id);
+      const leaderTeams = myTeams.filter(t => t.leaderId === (req.user as any).id);
+      let deleted = 0;
+      for (const t of leaderTeams) {
+        const reqs = await storage.getTeamRequests(t.id);
+        for (const r of reqs) {
+          // reuse existing update to mark as rejected for audit or hard delete? We'll hard delete for clear
+        }
+      }
+      // Hard delete all requests for leader teams
+      // Direct access via storage is not defined; use db via storage helper: delete all except none
+      // For simplicity, mark all as rejected and then filter them out from GET. We'll just mark rejected here.
+      for (const t of leaderTeams) {
+        const reqs = await storage.getTeamRequests(t.id);
+        for (const r of reqs) {
+          await storage.updateTeamRequest(r.id, "rejected");
+          deleted++;
+        }
+      }
+      res.json({ success: true, cleared: deleted });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to clear requests" });
+    }
+  });
+
+  app.get("/api/teams/my/requests/pending", async (req, res) => {
+    if (!req.user) return res.status(401).json({ error: "Not authenticated" });
+    try {
+      const myTeams = await storage.getTeamsByUser((req.user as any).id);
+      const leaderTeams = myTeams.filter(t => t.leaderId === (req.user as any).id);
+      const all = await Promise.all(leaderTeams.map(t => storage.getTeamRequests(t.id)));
+      const requests = all.flat().filter(r => r.status === "pending");
+      res.json({ count: requests.length });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch pending requests" });
     }
   });
 
@@ -290,10 +483,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Events routes
   app.get("/api/events", async (req, res) => {
     try {
-      const events = await storage.getActiveEvents();
+      const { domain } = req.query as { domain?: string };
+      let events = await storage.getActiveEvents();
+      if (domain && typeof domain === "string") {
+        events = events.filter(e => (e as any).domain === domain);
+      } else if (req.user) {
+        // If a student/user is logged in and no explicit domain specified,
+        // filter by their email domain so they only see institution events for their domain
+        const email = (req.user as any).email as string | undefined;
+        const userDomain = email ? email.split('@')[1] : undefined;
+        if (userDomain) {
+          events = events.filter(e => (e as any).domain === userDomain);
+        }
+      }
       res.json(events);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch events" });
+    }
+  });
+
+  // Create event (institution only)
+  app.post("/api/events", async (req, res) => {
+    try {
+      const inst = (req.session as any).institution;
+      if (!inst) {
+        return res.status(403).json({ error: "Only institutions can create events" });
+      }
+      const raw = req.body || {};
+      const payload = insertEventSchema.parse({
+        ...raw,
+        // Ensure dates are Date objects
+        startDate: raw.startDate ? new Date(raw.startDate) : undefined,
+        endDate: raw.endDate ? new Date(raw.endDate) : undefined,
+        registrationDeadline: raw.registrationDeadline ? new Date(raw.registrationDeadline) : undefined,
+        domain: inst.domain,
+        organizer: raw.organizer || inst.email
+      });
+      const created = await storage.createEvent(payload);
+      res.json(created);
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : "Invalid data" });
+    }
+  });
+
+  // Institution: list students of own domain
+  app.get("/api/institution/students", async (req, res) => {
+    try {
+      const inst = (req.session as any).institution;
+      if (!inst) {
+        return res.status(403).json({ error: "Not authorized" });
+      }
+      const domain = inst.domain as string;
+      const students = await storage.getUsersByEmailDomain(domain);
+      const minimal = students.map(u => ({ id: u.id, name: u.name, department: u.department }));
+      res.json(minimal);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch students" });
     }
   });
 

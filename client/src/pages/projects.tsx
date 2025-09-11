@@ -3,6 +3,9 @@ import { useQuery } from "@tanstack/react-query";
 import { Sidebar } from "@/components/sidebar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
@@ -23,10 +26,39 @@ import { Link } from "wouter";
 
 export default function Projects() {
   const { user, isAuthenticated } = useAuth();
+  const queryClient = useQueryClient();
 
   const { data: myTeams = [], isLoading } = useQuery<Team[]>({
     queryKey: ["/api/teams/my"],
     enabled: isAuthenticated
+  });
+
+  const fetchRequests = (teamId: string) => ({
+    queryKey: ["/api/teams", teamId, "requests"],
+    queryFn: () => apiRequest("GET", `/api/teams/${teamId}/requests`),
+    enabled: isAuthenticated
+  } as const);
+
+  const updateRequestMutation = useMutation({
+    mutationFn: ({ requestId, status }: { requestId: string; status: "approved" | "rejected" }) =>
+      apiRequest("PUT", `/api/team-requests/${requestId}`, { status }),
+    onSuccess: (_data, variables) => {
+      // Invalidate all team requests queries
+      queryClient.invalidateQueries({ queryKey: ["/api/teams"] });
+      // Refetch all manage dialogs by team id after change
+      queryClient.invalidateQueries({ predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === "/api/teams" && q.queryKey[2] === "requests" });
+      queryClient.invalidateQueries({ queryKey: ["/api/teams/my"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/teams/my/requests/pending"] });
+    }
+  });
+
+  const clearAllRequestsMutation = useMutation({
+    mutationFn: ({ teamId }: { teamId: string }) => apiRequest("DELETE", `/api/teams/${teamId}/requests`),
+    onSuccess: async () => {
+      // Refresh all requests and pending count
+      queryClient.invalidateQueries({ predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === "/api/teams" && q.queryKey[2] === "requests" });
+      queryClient.invalidateQueries({ queryKey: ["/api/teams/my/requests/pending"] });
+    }
   });
 
   if (!isAuthenticated || !user) {
@@ -282,10 +314,31 @@ export default function Projects() {
                               </Link>
                             </Button>
                             {isLeader && (
-                              <Button variant="outline" size="sm" data-testid={`button-manage-${team.id}`}>
-                                <Settings className="h-4 w-4 mr-2" />
-                                Manage
-                              </Button>
+                              <Dialog>
+                                <DialogTrigger asChild>
+                                  <Button variant="outline" size="sm" data-testid={`button-manage-${team.id}`}>
+                                    <Settings className="h-4 w-4 mr-2" />
+                                    Manage
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent className="sm:max-w-[600px]">
+                                  <DialogHeader>
+                                    <DialogTitle>Manage Requests</DialogTitle>
+                                  </DialogHeader>
+                                  <div className="flex justify-end mb-3">
+                                    <Button
+                                      variant="destructive"
+                                      size="sm"
+                                      onClick={() => clearAllRequestsMutation.mutate({ teamId: team.id })}
+                                      disabled={clearAllRequestsMutation.isPending}
+                                      data-testid={`button-clear-all-requests-${team.id}`}
+                                    >
+                                      {clearAllRequestsMutation.isPending ? "Clearing..." : "Clear All"}
+                                    </Button>
+                                  </div>
+                                  <RequestsList teamId={team.id} onAction={(id, status) => updateRequestMutation.mutate({ requestId: id, status })} />
+                                </DialogContent>
+                              </Dialog>
                             )}
                           </div>
                         </div>
@@ -370,6 +423,40 @@ export default function Projects() {
           </div>
         </div>
       </main>
+    </div>
+  );
+}
+
+function RequestsList({ teamId, onAction }: { teamId: string; onAction: (requestId: string, status: "approved" | "rejected") => void }) {
+  const { data: requests = [], isLoading, refetch } = useQuery<any[]>({
+    queryKey: ["/api/teams", teamId, "requests"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/teams/${teamId}/requests`);
+      return res.json();
+    },
+  });
+
+  if (isLoading) {
+    return <div className="space-y-2 text-sm text-muted-foreground">Loading requests...</div>;
+  }
+  if (!requests.length) {
+    return <div className="text-sm text-muted-foreground">No pending requests</div>;
+  }
+
+  return (
+    <div className="space-y-3">
+      {requests.map((req) => (
+        <div key={req.id} className="flex items-center justify-between border rounded-md p-3">
+          <div>
+            <div className="font-medium text-foreground">{req.user?.name || req.userId}</div>
+            {req.message && <div className="text-sm text-muted-foreground">{req.message}</div>}
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => { onAction(req.id, "rejected"); setTimeout(() => refetch(), 100); }}>Deny</Button>
+            <Button size="sm" onClick={() => { onAction(req.id, "approved"); setTimeout(() => refetch(), 100); }}>Approve</Button>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

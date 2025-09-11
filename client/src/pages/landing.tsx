@@ -1,11 +1,15 @@
+import TeamSyncLogo from "../assets/teamsync-logo.png";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Users, Trophy, Zap, Shield, Star, Github, Linkedin } from "lucide-react";
 import { GOOGLE_AUTH_URL } from "@/lib/auth";
 import { useAuth } from "@/hooks/use-auth";
 import { Link } from "wouter";
+import { useLocation } from "wouter";
 
 export default function Landing() {
   const { isAuthenticated, user } = useAuth();
@@ -52,7 +56,7 @@ export default function Landing() {
                 isAnimating ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'
               }`}
             >
-              TeamSync Edu is a specialized educational team formation platform designed to revolutionize 
+              TeamSync is a specialized team formation platform designed to revolutionize 
               how students at Indian technical universities collaborate for hackathons, competitions, and academic projects.
             </p>
             
@@ -71,6 +75,19 @@ export default function Landing() {
                 🎓 Only for University Students (no gmail.com accounts)
               </p>
             </div>
+          </div>
+
+          {/* Institutional Login */}
+          <div className="mt-12 max-w-3xl mx-auto">
+            <Card>
+              <CardHeader>
+                <CardTitle>Institutional Login</CardTitle>
+                <CardDescription>Institutions can log in to create events and view students by domain.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <InstitutionLoginForm />
+              </CardContent>
+            </Card>
           </div>
 
           {/* Floating Team Cards Animation */}
@@ -130,7 +147,7 @@ export default function Landing() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold text-foreground mb-4">
-              Why Choose TeamSync Edu?
+              Why Choose TeamSync?
             </h2>
             <p className="text-xl text-muted-foreground">
               Built specifically for Indian technical universities with institutional security
@@ -202,7 +219,7 @@ export default function Landing() {
           </p>
           <Button size="lg" asChild className="bg-primary hover:bg-primary/90 text-lg px-8 py-6">
             <a href={GOOGLE_AUTH_URL} data-testid="button-join-now">
-              Join TeamSync Edu Now
+              Join TeamSync Now
             </a>
           </Button>
         </div>
@@ -212,11 +229,9 @@ export default function Landing() {
       <footer className="bg-card border-t border-border py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
-            <div className="flex items-center justify-center space-x-3 mb-4">
-              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                <Users className="text-primary-foreground text-sm" />
-              </div>
-              <h3 className="text-lg font-bold text-foreground">TeamSync Edu</h3>
+            <div className="flex items-center justify-center space-x-2 mb-4">
+              <img src={TeamSyncLogo} alt="TeamSync Logo" className="w-6 h-6 object-contain" />
+              <h3 className="text-lg font-bold text-foreground">TeamSync</h3>
             </div>
             <p className="text-muted-foreground mb-6">
               Made with ❤️ by <strong>Team N00B</strong> for Digital Dawn Hackathon
@@ -228,5 +243,63 @@ export default function Landing() {
         </div>
       </footer>
     </div>
+  );
+}
+
+function InstitutionLoginForm() {
+  const [, navigate] = useLocation();
+  const [email, setEmail] = useState("admin@vit.ac.in");
+  const [password, setPassword] = useState("vit");
+  const [domain, setDomain] = useState("vitstudent.ac.in");
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/auth/institution/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email, password, domain })
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Login failed");
+      }
+      setMessage("Logged in successfully as institution.");
+      navigate("/institution");
+    } catch (err: any) {
+      setMessage(err.message || "Login failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={onSubmit} className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+          <Label htmlFor="inst-email">Email</Label>
+          <Input id="inst-email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="admin@vit.ac.in" />
+        </div>
+        <div>
+          <Label htmlFor="inst-password">Password</Label>
+          <Input id="inst-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••" />
+        </div>
+        <div>
+          <Label htmlFor="inst-domain">Domain</Label>
+          <Input id="inst-domain" value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="vitstudent.ac.in" />
+        </div>
+      </div>
+      <div className="flex items-center gap-3">
+        <Button type="submit" disabled={loading} data-testid="button-institution-login">
+          {loading ? "Logging in..." : "Institution Login"}
+        </Button>
+        {message && <span className="text-sm text-muted-foreground">{message}</span>}
+      </div>
+    </form>
   );
 }

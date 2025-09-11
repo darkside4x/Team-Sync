@@ -11,7 +11,6 @@ import {
   UserPlus, 
   Star, 
   Trophy, 
-  Bell, 
   Plus,
   Calendar,
   Settings,
@@ -21,6 +20,7 @@ import {
 } from "lucide-react";
 import type { Team, Event } from "@shared/schema";
 import { Link } from "wouter";
+import { CreateTeamModal } from "@/components/create-team-modal";
 
 export default function Dashboard() {
   const { user, isAuthenticated } = useAuth();
@@ -37,6 +37,11 @@ export default function Dashboard() {
 
   const { data: events = [] } = useQuery<Event[]>({
     queryKey: ["/api/events"],
+    enabled: isAuthenticated
+  });
+
+  const { data: pending = { count: 0 } } = useQuery<{ count: number}>({
+    queryKey: ["/api/teams/my/requests/pending"],
     enabled: isAuthenticated
   });
 
@@ -64,16 +69,12 @@ export default function Dashboard() {
               <p className="text-muted-foreground">Welcome back! Find your perfect team for upcoming hackathons.</p>
             </div>
             <div className="flex items-center space-x-4">
-              <Button variant="ghost" size="sm" className="relative" data-testid="button-notifications">
-                <Bell className="h-5 w-5" />
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground text-xs rounded-full flex items-center justify-center">
-                  3
-                </span>
-              </Button>
-              <Button className="bg-primary text-primary-foreground" data-testid="button-create-team">
-                <Plus className="mr-2 h-4 w-4" />
-                Create Team
-              </Button>
+              <CreateTeamModal>
+                <Button className="bg-primary text-primary-foreground" data-testid="button-create-team">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create Team
+                </Button>
+              </CreateTeamModal>
             </div>
           </div>
         </header>
@@ -103,14 +104,14 @@ export default function Dashboard() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Team Requests</p>
-                    <p className="text-2xl font-bold text-foreground">0</p>
+                    <p className="text-2xl font-bold text-foreground">{pending?.count ?? 0}</p>
                   </div>
                   <div className="w-12 h-12 bg-accent/10 rounded-lg flex items-center justify-center">
                     <UserPlus className="text-accent text-xl" />
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
-                  No pending requests
+                  {pending?.count ? `${pending.count} pending` : "No pending requests"}
                 </p>
               </CardContent>
             </Card>

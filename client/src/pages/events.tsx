@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Calendar, Clock, MapPin, Users, Trophy, Search, Filter, ExternalLink } from "lucide-react";
 import type { Event } from "@shared/schema";
 import { Link } from "wouter";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const EVENT_CATEGORIES = [
   { value: "all", label: "All Events" },
@@ -23,11 +23,76 @@ export default function Events() {
   const { user, isAuthenticated } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [institution, setInstitution] = useState<{ email: string; domain: string; role: string } | null>(null);
+  const [students, setStudents] = useState<Array<{ id: string; name: string; department: string | null }>>([]);
+  const [showCreate, setShowCreate] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [newEvent, setNewEvent] = useState({
+    name: "",
+    description: "",
+    category: "hackathon",
+    startDate: "",
+    endDate: "",
+    registrationDeadline: "",
+    website: ""
+  });
 
   const { data: events = [], isLoading } = useQuery<Event[]>({
-    queryKey: ["/api/events"],
+    queryKey: ["/api/events", institution?.domain ? `?domain=${institution.domain}` : ""],
     enabled: isAuthenticated
   });
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/auth/institution/me", { credentials: "include" });
+        if (res.ok) {
+          const inst = await res.json();
+          setInstitution(inst);
+          // Fetch students for this institution
+          const sres = await fetch("/api/institution/students", { credentials: "include" });
+          if (sres.ok) {
+            const list = await sres.json();
+            setStudents(list);
+          }
+        } else {
+          setInstitution(null);
+        }
+      } catch {
+        setInstitution(null);
+      }
+    })();
+  }, []);
+
+  const createEvent = async () => {
+    setCreating(true);
+    try {
+      const payload = {
+        ...newEvent,
+        startDate: newEvent.startDate ? new Date(newEvent.startDate).toISOString() : undefined,
+        endDate: newEvent.endDate ? new Date(newEvent.endDate).toISOString() : undefined,
+        registrationDeadline: newEvent.registrationDeadline ? new Date(newEvent.registrationDeadline).toISOString() : undefined
+      };
+      const res = await fetch("/api/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to create event");
+      }
+      setShowCreate(false);
+      setNewEvent({ name: "", description: "", category: "hackathon", startDate: "", endDate: "", registrationDeadline: "", website: "" });
+      // reload
+      window.location.reload();
+    } catch (e) {
+      // noop minimal feedback for now
+    } finally {
+      setCreating(false);
+    }
+  };
 
   if (!isAuthenticated || !user) {
     return <Link href="/" />;
@@ -93,14 +158,37 @@ export default function Events() {
               <h2 className="text-2xl font-bold text-foreground">Events & Competitions</h2>
               <p className="text-muted-foreground">Discover hackathons, competitions, and academic events</p>
             </div>
-            <Button className="bg-primary text-primary-foreground" data-testid="button-create-event">
-              <Calendar className="mr-2 h-4 w-4" />
-              Create Event
-            </Button>
+            {institution && (
+              <Button className="bg-primary text-primary-foreground" data-testid="button-create-event" onClick={() => setShowCreate(true)}>
+                <Calendar className="mr-2 h-4 w-4" />
+                Create Event
+              </Button>
+            )}
           </div>
         </header>
 
         <div className="p-6 space-y-6">
+          {institution && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Students in domain: {institution.domain}</CardTitle>
+                <CardDescription>Visible to institution admins only.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {students.map((s) => (
+                    <div key={s.id} className="text-sm flex items-center justify-between border rounded px-3 py-2">
+                      <span>{s.name}</span>
+                      <Badge variant="secondary">{s.department || "N/A"}</Badge>
+                    </div>
+                  ))}
+                  {students.length === 0 && (
+                    <div className="text-sm text-muted-foreground">No students found for this domain yet.</div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
           {/* Filters */}
           <Card>
             <CardHeader>
@@ -228,23 +316,15 @@ export default function Events() {
                             </Badge>
                           )}
 
-                          <div className="flex gap-2 pt-2">
-                            <Button 
-                              size="sm" 
-                              className="flex-1"
-                              disabled={!isRegistrationOpen}
-                              data-testid={`button-register-${event.id}`}
-                            >
-                              {isRegistrationOpen ? "Register Now" : "Registration Closed"}
-                            </Button>
-                            {event.website && (
-                              <Button variant="outline" size="sm" asChild>
+                          {event.website && (
+                            <div className="flex pt-2">
+                              <Button variant="outline" size="sm" asChild className="ml-auto">
                                 <a href={event.website} target="_blank" rel="noopener noreferrer">
                                   <ExternalLink className="h-4 w-4" />
                                 </a>
                               </Button>
-                            )}
-                          </div>
+                            </div>
+                          )}
                         </div>
                       </CardContent>
                     </Card>

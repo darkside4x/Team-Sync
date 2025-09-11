@@ -17,14 +17,17 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useEffect } from "react";
+import type { Event } from "@shared/schema";
 
 const createTeamSchema = z.object({
   name: z.string().min(3, "Team name must be at least 3 characters").max(50),
   description: z.string().max(500, "Description must be less than 500 characters").optional(),
   category: z.string().min(1, "Please select a category"),
-  eventName: z.string().optional(),
+  eventName: z.string().min(1, "Please select an event"),
   maxMembers: z.number().min(2).max(10),
   deadline: z.date().optional(),
+  deadlineTime: z.string().optional(),
   requiredSkills: z.array(z.string()).optional()
 });
 
@@ -67,7 +70,11 @@ export function CreateTeamModal({ children }: CreateTeamModalProps) {
       const payload = {
         ...data,
         requiredSkills: skills,
-        deadline: data.deadline?.toISOString()
+        deadline: data.deadline
+          ? new Date(
+              `${format(data.deadline, "yyyy-MM-dd")}T${data.deadlineTime || "23:59"}:00`
+            ).toISOString()
+          : undefined
       };
       return apiRequest("POST", "/api/teams", payload);
     },
@@ -77,6 +84,7 @@ export function CreateTeamModal({ children }: CreateTeamModalProps) {
         description: "Your team has been created and you've been added as the leader."
       });
       queryClient.invalidateQueries({ queryKey: ["/api/teams"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/teams", "?all=true"] });
       queryClient.invalidateQueries({ queryKey: ["/api/teams/my"] });
       setOpen(false);
       form.reset();
@@ -90,6 +98,39 @@ export function CreateTeamModal({ children }: CreateTeamModalProps) {
       });
     }
   });
+
+  const [institution, setInstitution] = useState<{ email: string; domain: string; role: string } | null>(null);
+  const [domainEvents, setDomainEvents] = useState<Event[]>([]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const ures = await fetch("/api/auth/me", { credentials: "include" });
+        const user = await ures.json().catch(() => null);
+        const ires = await fetch("/api/auth/institution/me", { credentials: "include" });
+        const inst = ires.ok ? await ires.json() : null;
+        setInstitution(inst);
+        const domain = inst?.domain || (typeof user?.email === 'string' ? user.email.split('@')[1] : undefined);
+        if (domain) {
+          const es = await fetch(`/api/events?domain=${encodeURIComponent(domain)}`, { credentials: "include" });
+          if (es.ok) {
+            const list = await es.json();
+            setDomainEvents(list);
+          }
+          // Fallback: attempt without explicit domain (server will auto-filter for authenticated users)
+          if (!Array.isArray(domainEvents) || domainEvents.length === 0) {
+            const es2 = await fetch(`/api/events`, { credentials: "include" });
+            if (es2.ok) {
+              const list2 = await es2.json();
+              setDomainEvents(list2);
+            }
+          }
+        }
+      } catch {
+        setDomainEvents([]);
+      }
+    })();
+  }, []);
 
   const addSkill = () => {
     if (newSkill.trim() && !skills.includes(newSkill.trim())) {
@@ -182,13 +223,26 @@ export function CreateTeamModal({ children }: CreateTeamModalProps) {
             </div>
 
             <div>
-              <Label htmlFor="eventName">Event/Competition Name</Label>
-              <Input
-                id="eventName"
-                {...form.register("eventName")}
-                placeholder="e.g., Smart India Hackathon 2024"
-                data-testid="input-event-name"
-              />
+              <Label htmlFor="eventName">Event/Competition</Label>
+              <Select
+                value={form.watch("eventName") || undefined}
+                onValueChange={(v) => form.setValue("eventName", v, { shouldValidate: true })}
+                disabled={domainEvents.length === 0}
+              >
+                <SelectTrigger data-testid="select-event-name">
+                  <SelectValue placeholder={domainEvents.length === 0 ? "No events available" : "Choose event from your institution"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {domainEvents.map((evt) => (
+                    <SelectItem key={evt.id} value={evt.name}>
+                      {evt.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {form.formState.errors.eventName && (
+                <p className="text-sm text-destructive">{form.formState.errors.eventName.message as string}</p>
+              )}
             </div>
 
             <div>
@@ -221,6 +275,18 @@ export function CreateTeamModal({ children }: CreateTeamModalProps) {
                   />
                 </PopoverContent>
               </Popover>
+              {form.watch("deadline") && (
+                <div className="mt-2">
+                  <Label htmlFor="deadlineTime" className="text-xs text-muted-foreground">Time</Label>
+                  <Input
+                    id="deadlineTime"
+                    type="time"
+                    step="60"
+                    {...form.register("deadlineTime")}
+                    data-testid="input-deadline-time"
+                  />
+                </div>
+              )}
             </div>
 
             <div>

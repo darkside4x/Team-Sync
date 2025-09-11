@@ -9,11 +9,38 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
+import { useEffect, useState } from "react";
+
+import TeamSyncLogo from "../assets/teamsync-logo.png";
 import { Users, LogOut, User, Settings } from "lucide-react";
 
 export function Navbar() {
   const { user, isAuthenticated } = useAuth();
+  const [institution, setInstitution] = useState<{ email: string; domain: string; role: string } | null>(null);
+  const [location, navigate] = useLocation();
+
+  // Lazy import to avoid circular deps
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _noop = useLocation;
+
+  // Detect institution session
+  // We keep it lightweight; no react-query to avoid coupling with user auth
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/auth/institution/me", { credentials: "include" });
+        if (res.ok) {
+          setInstitution(await res.json());
+        } else {
+          setInstitution(null);
+        }
+      } catch {
+        setInstitution(null);
+      }
+    })();
+  }, [location]);
 
   return (
     <nav className="bg-card/80 backdrop-blur-md border-b border-border sticky top-0 z-50">
@@ -21,18 +48,30 @@ export function Navbar() {
         <div className="flex justify-between items-center h-16">
           <Link href="/">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-                <Users className="text-primary-foreground text-lg" />
-              </div>
+              <img src={TeamSyncLogo} alt="TeamSync Logo" className="w-10 h-10 object-contain" />
               <div>
-                <h1 className="text-xl font-bold text-foreground">TeamSync Edu</h1>
+                <h1 className="text-xl font-bold text-foreground">TeamSync</h1>
                 <p className="text-xs text-muted-foreground">by Team N00B</p>
               </div>
             </div>
           </Link>
 
           <div className="flex items-center space-x-4">
-            {isAuthenticated && user ? (
+            {institution ? (
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-muted-foreground hidden sm:inline">{institution.domain}</span>
+                <Button variant="outline" onClick={async () => {
+                  try {
+                    await fetch("/api/auth/institution/logout", { method: "POST", credentials: "include" });
+                  } finally {
+                    setInstitution(null);
+                    navigate("/");
+                  }
+                }}>
+                  Logout Institution
+                </Button>
+              </div>
+            ) : isAuthenticated && user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="h-10 w-10 rounded-full p-0">
