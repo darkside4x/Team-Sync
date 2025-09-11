@@ -10,6 +10,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Link } from "wouter";
+
+import TeamSyncLogo from "../assets/teamsync-logo.png";
 import { Users, LogOut, User, Settings } from "lucide-react";
 
 export function Navbar() {
@@ -21,11 +23,9 @@ export function Navbar() {
         <div className="flex justify-between items-center h-16">
           <Link href="/">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-                <Users className="text-primary-foreground text-lg" />
-              </div>
+              <img src={TeamSyncLogo} alt="TeamSync Logo" className="w-10 h-10 object-contain" />
               <div>
-                <h1 className="text-xl font-bold text-foreground">TeamSync Edu</h1>
+                <h1 className="text-xl font-bold text-foreground">TeamSync</h1>
                 <p className="text-xs text-muted-foreground">by Team N00B</p>
               </div>
             </div>
